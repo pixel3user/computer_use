@@ -1,0 +1,8 @@
+# Naukri.com Job Listing URLs
+# Add one URL per line
+# Lines starting with # are comments
+# Empty lines are ignored
+
+# Example URLs (replace with actual job listing URLs):
+# https://www.naukri.com/job-listings-software-engineer-company-name-city-1-to-3-years-123456789
+# https://www.naukri.com/job-listings-senior-developer-another-company-bangalore-5-to-8-years-987654321

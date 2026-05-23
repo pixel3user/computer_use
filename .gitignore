@@ -6,5 +6,7 @@ dist/
 build/
 .browser_data/
 .env
+config.yaml
 applications.csv
+*.pdf
 .pytest_cache/

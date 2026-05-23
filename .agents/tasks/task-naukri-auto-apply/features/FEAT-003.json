@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "docs",
   "description": "Create comprehensive README.md with setup instructions, usage guide, architecture overview, and security notes. Also create a sample URLs input file and ensure all example configs are complete.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create README.md with sections: Project Overview, Features, Prerequisites (Python 3.11, Playwright), Installation (step-by-step with pyenv and venv), Configuration (explain YAML config + .env for secrets), Usage (CLI commands with examples), Input Format (URLs file format), Output (CSV log description with sample), Architecture (module descriptions), Security Notes (credential handling, session persistence), Troubleshooting (common issues), Limitations and Disclaimers (rate limiting, ToS awareness).",
     "Create sample_urls.txt with example Naukri.com job listing URL format (one URL per line, with comments showing format)",

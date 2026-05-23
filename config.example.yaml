@@ -1,23 +1,40 @@
 # Naukri Auto-Apply Configuration
+# Copy this file to config.yaml and fill in your details.
+
+# Your profile information used to fill application forms
 user_profile:
+  # Full name as it should appear on applications
   name: "Your Full Name"
+  # Email address for applications
   email: "your_email@example.com"
+  # Phone number with country code
   phone: "+91-9999999999"
+  # Path to your resume PDF (absolute or relative to working directory)
   resume_path: "./resume.pdf"
+  # LinkedIn profile URL (optional, used for external forms)
   linkedin_url: "https://linkedin.com/in/yourprofile"
+  # Total years of professional experience (optional)
   experience_years: 5
+  # Current employer name (optional)
   current_company: "Current Company Name"
+  # Current job title (optional)
   current_designation: "Software Engineer"
+  # Notice period at current job (optional)
   notice_period: "30 days"
 
-# Naukri.com credentials (can also be set via env vars)
+# Naukri.com credentials
+# These can also be set via NAUKRI_EMAIL and NAUKRI_PASSWORD environment
+# variables in a .env file. Environment variables take priority.
 naukri_email: ""
 naukri_password: ""
 
-# Output settings
+# Path to the CSV file where application results are logged
 output_csv: "applications.csv"
 
 # Browser settings
+# Set to true to run without a visible browser window
 headless: false
+# Delay in milliseconds between browser actions (increase if pages load slowly)
 slow_mo: 100
+# Directory to store browser session data (login persists between runs)
 user_data_dir: ".browser_data"
