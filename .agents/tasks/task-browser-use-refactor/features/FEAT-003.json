@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "refactor",
   "description": "Rewrite the test suite to match the new browser-use-based architecture. Tests should mock browser-use's Agent class rather than Playwright page objects. Keep test_config.py and test_logger.py and test_models.py with minimal changes. Replace test_applicator.py, test_easy_apply.py, test_external_apply.py, test_form_filler.py, test_llm_agent.py, test_direct_apply.py with new tests for the NaukriAgent class and updated BrowserManager.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Step 1 - Update tests/conftest.py: Keep sample_user_profile and sample_job_listing fixtures. Add a mock_config fixture that creates a full AppConfig-compatible mock (including llm.model, groq_api_key, user_data_dir, headless, etc.). Add a mock_agent_history fixture that returns a mock AgentHistoryList with a final_result() method.",
     "Step 2 - Update tests/test_config.py: Update test_llm_config_defaults to check for new default model 'meta-llama/llama-4-scout-17b-16e-instruct'. Keep all other tests as-is since AppConfig structure is backward-compatible.",

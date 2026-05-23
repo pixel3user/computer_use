@@ -95,6 +95,7 @@ class TestConfigLoading:
         assert config.llm.model == "meta-llama/llama-4-scout-17b-16e-instruct"
         assert config.llm.max_tokens == 4096
         assert config.llm.temperature == 0.2
+        assert config.llm.max_steps == 50
 
     def test_quota_config_defaults(self, tmp_path):
         """Test that quota config has correct defaults when not specified."""

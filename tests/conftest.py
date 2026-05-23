@@ -1,5 +1,6 @@
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 import yaml
@@ -62,3 +63,22 @@ def sample_config_yaml(tmp_path):
 @pytest.fixture
 def tmp_csv_path(tmp_path):
     return tmp_path / "test_applications.csv"
+
+
+@pytest.fixture
+def mock_app_config(sample_user_profile):
+    from naukri_apply.models import LLMConfig, QuotaConfig
+
+    config = MagicMock()
+    config.user_profile = sample_user_profile
+    config.naukri_email = "naukri@example.com"
+    config.naukri_password = "secret123"
+    config.groq_api_key = "gsk_test_key"
+    config.headless = True
+    config.slow_mo = 50
+    config.user_data_dir = Path(".browser_data")
+    config.output_csv = Path("applications.csv")
+    config.delay_between_applications = 5.0
+    config.llm = LLMConfig()
+    config.quota = QuotaConfig()
+    return config
