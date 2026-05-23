@@ -20,6 +20,11 @@ class NaukriAgent:
     """Agent that uses browser-use for visual browser automation."""
 
     def __init__(self, config: AppConfig, browser: BrowserSession):
+        if not config.groq_api_key:
+            raise ValueError(
+                "GROQ_API_KEY is required but not set. "
+                "Set it in your .env file or as an environment variable."
+            )
         self._config = config
         self._browser = browser
         self._llm = ChatGroq(
@@ -28,6 +33,12 @@ class NaukriAgent:
             temperature=config.llm.temperature,
         )
         self._max_steps = config.llm.max_steps
+        self._max_steps_dry_run = config.llm.max_steps_dry_run
+        logger.info(
+            "NaukriAgent initialized. Profile data will be sent to the LLM provider (%s) "
+            "as part of application prompts.",
+            config.llm.model,
+        )
 
     def _build_profile_context(self, profile: UserProfile) -> str:
         """Build a text summary of user profile for the agent's task prompt."""
@@ -94,12 +105,15 @@ class NaukriAgent:
             )
 
         try:
+            file_paths = [str(profile.resume_path)] if profile.resume_path else []
             agent = Agent(
                 task=task,
                 llm=self._llm,
                 browser=self._browser,
+                available_file_paths=file_paths,
             )
-            history = await agent.run(max_steps=self._max_steps)
+            steps = self._max_steps_dry_run if dry_run else self._max_steps
+            history = await agent.run(max_steps=steps)
             result_text = history.final_result() or ""
 
             # Parse the agent's result
@@ -157,10 +171,12 @@ class NaukriAgent:
         )
 
         try:
+            file_paths = [str(profile.resume_path)] if profile.resume_path else []
             agent = Agent(
                 task=task,
                 llm=self._llm,
                 browser=self._browser,
+                available_file_paths=file_paths,
             )
             history = await agent.run(max_steps=self._max_steps)
             result_text = history.final_result() or ""
@@ -232,17 +248,19 @@ class NaukriAgent:
 
     def _determine_status(self, text: str) -> ApplicationStatus:
         """Determine application status from agent response text."""
-        status_str = self._extract_field(text, "STATUS") or ""
-        lower = status_str.lower()
-        if "applied" in lower and "partial" not in lower:
-            return ApplicationStatus.APPLIED
-        elif "partial" in lower or "external_partial" in lower:
-            return ApplicationStatus.EXTERNAL_PARTIAL
-        elif "failed" in lower:
+        status_str = self._extract_field(text, "STATUS")
+        if status_str:
+            lower = status_str.lower()
+            if "applied" in lower and "partial" not in lower:
+                return ApplicationStatus.APPLIED
+            elif "partial" in lower or "external_partial" in lower:
+                return ApplicationStatus.EXTERNAL_PARTIAL
+            elif "failed" in lower:
+                return ApplicationStatus.FAILED
+            elif "skipped" in lower:
+                return ApplicationStatus.SKIPPED
             return ApplicationStatus.FAILED
-        elif "skipped" in lower:
-            return ApplicationStatus.SKIPPED
-        # If no clear status, check the full text for success indicators
+        # Only use fallback heuristic if the STATUS field is completely absent
         full_lower = text.lower()
         if "successfully" in full_lower or "submitted" in full_lower:
             return ApplicationStatus.APPLIED

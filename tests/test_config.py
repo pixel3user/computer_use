@@ -91,11 +91,11 @@ class TestConfigLoading:
 
         config = load_config(config_file)
 
-        assert config.llm.enabled is True
         assert config.llm.model == "meta-llama/llama-4-scout-17b-16e-instruct"
         assert config.llm.max_tokens == 4096
         assert config.llm.temperature == 0.2
         assert config.llm.max_steps == 50
+        assert config.llm.max_steps_dry_run == 10
 
     def test_quota_config_defaults(self, tmp_path):
         """Test that quota config has correct defaults when not specified."""
@@ -131,10 +131,10 @@ class TestConfigLoading:
             "naukri_email": "naukri@example.com",
             "naukri_password": "secret123",
             "llm": {
-                "enabled": False,
                 "model": "custom-model",
                 "max_tokens": 2048,
                 "temperature": 0.5,
+                "max_steps_dry_run": 5,
             },
             "quota": {
                 "max_naukri_applications": 25,
@@ -148,10 +148,10 @@ class TestConfigLoading:
 
         config = load_config(config_file)
 
-        assert config.llm.enabled is False
         assert config.llm.model == "custom-model"
         assert config.llm.max_tokens == 2048
         assert config.llm.temperature == 0.5
+        assert config.llm.max_steps_dry_run == 5
         assert config.quota.max_naukri_applications == 25
         assert config.quota.enable_direct_apply is False
 

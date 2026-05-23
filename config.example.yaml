@@ -55,8 +55,6 @@ user_data_dir: ".browser_data"
 # to the Groq API as part of prompts for form filling and screening questions.
 # Ensure you are comfortable with this data being processed by a third-party API.
 llm:
-  # Enable or disable LLM-powered form filling and screening question answering
-  enabled: true
   # Model to use for LLM completions
   model: "meta-llama/llama-4-scout-17b-16e-instruct"
   # Maximum tokens for LLM responses
@@ -65,6 +63,8 @@ llm:
   temperature: 0.2
   # Maximum number of browser-use agent steps per task
   max_steps: 50
+  # Maximum steps for dry-run metadata extraction (lower to reduce cost)
+  max_steps_dry_run: 10
 
 # Quota and direct-apply settings
 quota:

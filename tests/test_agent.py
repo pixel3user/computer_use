@@ -8,6 +8,28 @@ from naukri_apply.agent import NaukriAgent
 from naukri_apply.models import ApplicationStatus, ApplyType
 
 
+class TestNaukriAgentInit:
+    def test_raises_value_error_when_groq_api_key_is_none(self, mock_app_config):
+        mock_app_config.groq_api_key = None
+        browser = MagicMock()
+
+        with pytest.raises(ValueError, match="GROQ_API_KEY is required"):
+            NaukriAgent(config=mock_app_config, browser=browser)
+
+    def test_raises_value_error_when_groq_api_key_is_empty(self, mock_app_config):
+        mock_app_config.groq_api_key = ""
+        browser = MagicMock()
+
+        with pytest.raises(ValueError, match="GROQ_API_KEY is required"):
+            NaukriAgent(config=mock_app_config, browser=browser)
+
+    def test_initializes_successfully_with_valid_key(self, mock_app_config):
+        browser = MagicMock()
+        agent = NaukriAgent(config=mock_app_config, browser=browser)
+        assert agent._max_steps == 50
+        assert agent._max_steps_dry_run == 10
+
+
 class TestBuildProfileContext:
     def test_build_profile_context_includes_all_fields(self, mock_app_config):
         browser = MagicMock()
@@ -156,6 +178,35 @@ class TestApplyToJob:
 
         assert result.status == ApplicationStatus.SKIPPED
         assert "Dry run" in result.notes
+        # Verify dry run uses reduced max_steps
+        mock_agent_instance.run.assert_called_once_with(max_steps=10)
+
+    @pytest.mark.asyncio
+    @patch("naukri_apply.agent.Agent")
+    async def test_apply_to_job_passes_available_file_paths(
+        self, MockAgent, mock_app_config
+    ):
+        mock_history = MagicMock()
+        mock_history.final_result.return_value = (
+            "JOB_TITLE: Dev\n"
+            "COMPANY: Corp\n"
+            "LOCATION: Delhi\n"
+            "APPLY_TYPE: easy_apply\n"
+            "STATUS: applied\n"
+            "NOTES: Success"
+        )
+        mock_agent_instance = MagicMock()
+        mock_agent_instance.run = AsyncMock(return_value=mock_history)
+        MockAgent.return_value = mock_agent_instance
+
+        browser = MagicMock()
+        agent = NaukriAgent(config=mock_app_config, browser=browser)
+
+        await agent.apply_to_job("https://www.naukri.com/job-12345")
+
+        call_kwargs = MockAgent.call_args[1]
+        assert "available_file_paths" in call_kwargs
+        assert "resume.pdf" in call_kwargs["available_file_paths"][0]
 
 
 class TestDirectApply:
@@ -306,6 +357,32 @@ class TestDetermineStatus:
 
         text = "STATUS: external_partial\nNOTES: redirected"
         assert agent._determine_status(text) == ApplicationStatus.EXTERNAL_PARTIAL
+
+    def test_determine_status_no_false_positive_when_status_present(self, mock_app_config):
+        """STATUS field with unrecognized value should not fall through to heuristic."""
+        browser = MagicMock()
+        agent = NaukriAgent(config=mock_app_config, browser=browser)
+
+        # STATUS field is present but with an unrecognized value.
+        # The text also contains 'successfully' which should NOT trigger a false positive.
+        text = "STATUS: unknown_value\nNOTES: the form was not successfully submitted"
+        assert agent._determine_status(text) == ApplicationStatus.FAILED
+
+    def test_determine_status_fallback_heuristic_when_status_absent(self, mock_app_config):
+        """When STATUS field is completely absent, fallback heuristic should work."""
+        browser = MagicMock()
+        agent = NaukriAgent(config=mock_app_config, browser=browser)
+
+        text = "The application was successfully submitted to the company."
+        assert agent._determine_status(text) == ApplicationStatus.APPLIED
+
+    def test_determine_status_fallback_returns_failed_when_no_indicators(self, mock_app_config):
+        """When STATUS field is absent and no success indicators, return FAILED."""
+        browser = MagicMock()
+        agent = NaukriAgent(config=mock_app_config, browser=browser)
+
+        text = "Something went wrong during the process."
+        assert agent._determine_status(text) == ApplicationStatus.FAILED
 
 
 class TestExtractField:
