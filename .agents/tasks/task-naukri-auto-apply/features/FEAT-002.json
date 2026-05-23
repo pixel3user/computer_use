@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Implement the browser automation core: session management, job page navigation, Easy Apply logic, external site form-filling logic, and the CLI entry point that ties everything together. This is the main application logic.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create src/naukri_apply/browser.py with BrowserManager class: launches Playwright Chromium with persistent context (user_data_dir for session reuse), configures viewport/user-agent, provides async context manager for clean setup/teardown. Include a method to check if user is logged in by looking for profile elements on naukri.com.",
     "Create src/naukri_apply/applicator.py with JobApplicator class: takes a page and a job URL, navigates to it, extracts job metadata (company name, title, location) from the listing page DOM using Naukri's known selectors (e.g., .jd-header-title, .company-name, .location). Determines apply type: looks for 'Apply' or 'Easy Apply' button vs external redirect indicators. Returns a JobListing model.",
