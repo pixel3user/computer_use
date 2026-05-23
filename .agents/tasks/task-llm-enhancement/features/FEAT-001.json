@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Add LLM agent module powered by Groq API, update config/models to support LLM settings, enhance form_filler and easy_apply/external_apply to use LLM for intelligent form filling, and add quota bypass via direct company applications.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1: Add 'groq' to dependencies in pyproject.toml under [project].dependencies.",
     "Step 2: Update .env.example to include GROQ_API_KEY=your_groq_api_key_here.",
@@ -40,5 +40,5 @@
     "source .venv/bin/activate && python -c \"from naukri_apply.llm_agent import LLMAgent; from naukri_apply.direct_apply import DirectApplyHandler; from naukri_apply.models import ApplicationStatus; assert ApplicationStatus.DIRECT_APPLIED.value == 'direct_applied'; print('Imports OK')\""
   ],
   "blocked_reason": null,
-  "findings": "All 85 tests pass. Groq import needed to be at module level (not inside __init__) for proper test mocking. The navigate_and_apply_direct method returns True when the done action has success=True."
+  "findings": "All 85 tests pass after review fixes. Added validate_selector function with regex-based allowlist for form-related elements. Multi-turn loop uses MAX_NAVIGATION_ITERATIONS=5 and returns False if no page transition occurs (prevents infinite looping). LLM timeout set to 30 seconds via asyncio.wait_for. Quota counter now only counts APPLIED status, with a failure-threshold fallback (max(10, quota//5) extra attempts before switching). The find_company_career_page call now happens before navigation and its result is used as the actual search query."
 }
