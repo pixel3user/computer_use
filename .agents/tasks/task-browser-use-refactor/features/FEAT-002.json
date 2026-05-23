@@ -1,0 +1,41 @@
+{
+  "id": "FEAT-002",
+  "type": "refactor",
+  "description": "Refactor the core source modules to use browser-use Agent as the automation engine. Replace Playwright-based browser management, job applicator, easy apply, external apply, direct apply, form filler, and LLM agent with a browser-use-powered agent wrapper. Keep models.py, logger.py, and the CLI interface (main.py) largely intact.",
+  "status": "pending",
+  "steps": [
+    "Step 1 - Update src/naukri_apply/config.py: Add a 'browser_use' section to AppConfig for browser-use specific settings. Change LLMConfig default model to 'meta-llama/llama-4-scout-17b-16e-instruct'. Add max_steps field (default 50). Keep all existing fields for backward compatibility. The config should include model, temperature, max_tokens, max_steps.",
+    "Step 2 - Update src/naukri_apply/models.py: Keep all existing models as-is. No changes needed since the data models (UserProfile, JobListing, ApplicationResult, enums) are independent of the automation framework.",
+    "Step 3 - Replace src/naukri_apply/browser.py: Rewrite to use browser-use's BrowserSession and BrowserProfile instead of Playwright directly. The BrowserManager class should create a BrowserProfile(user_data_dir=config.user_data_dir, headless=config.headless) and a BrowserSession. Expose the BrowserSession for use by the agent. Keep the async context manager pattern (__aenter__/__aexit__). Keep the is_logged_in() method but implement it using browser-use's Agent to check login status. Add a method get_browser() that returns the BrowserSession instance.",
+    "Step 4 - Create src/naukri_apply/agent.py (NEW): This is the core new module. Create a NaukriAgent class that wraps browser-use's Agent. It should: (a) Accept config, browser_session, and build a ChatGroq(model=config.llm.model, api_key=config.groq_api_key, temperature=config.llm.temperature) LLM instance. (b) Have an apply_to_job(url, user_profile, dry_run=False) method that constructs a detailed task prompt for the browser-use Agent describing what to do (navigate to URL, extract job metadata, click apply, fill forms using user profile data, handle screening questions). The prompt should include the user's profile info so the agent can fill forms intelligently. (c) Have a check_login_status() method that uses the Agent to navigate to naukri.com and check for login indicators. (d) Have a direct_apply(job, user_profile) method for when quota is hit - constructs a task to Google the company career page and apply there. (e) Parse the Agent's final_result() to extract structured data (job title, company, location, status). (f) Return ApplicationResult objects.",
+    "Step 5 - Replace src/naukri_apply/applicator.py: Simplify to just a thin wrapper that calls NaukriAgent.apply_to_job(). Remove all DOM-based selectors. The agent itself handles page navigation and metadata extraction via screenshots/vision.",
+    "Step 6 - Delete src/naukri_apply/easy_apply.py: No longer needed. The browser-use agent handles the entire easy apply flow visually.",
+    "Step 7 - Delete src/naukri_apply/external_apply.py: No longer needed. The browser-use agent handles external ATS forms visually.",
+    "Step 8 - Delete src/naukri_apply/direct_apply.py: No longer needed. Functionality moved into NaukriAgent.direct_apply().",
+    "Step 9 - Delete src/naukri_apply/form_filler.py: No longer needed. The browser-use agent fills forms visually.",
+    "Step 10 - Delete src/naukri_apply/llm_agent.py: No longer needed. Replaced by NaukriAgent using browser-use's built-in Agent.",
+    "Step 11 - Update src/naukri_apply/main.py: Refactor _run_apply() to use NaukriAgent instead of the old handler classes. The flow becomes: (1) load config, (2) create BrowserManager, (3) create NaukriAgent with config and browser, (4) loop through URLs calling agent.apply_to_job(), (5) log results with CSVLogger, (6) handle quota switching to agent.direct_apply(). Refactor _run_check_session() to use NaukriAgent.check_login_status(). Keep all CLI commands and options identical.",
+    "Step 12 - Update config.example.yaml: Change default model to 'meta-llama/llama-4-scout-17b-16e-instruct'. Add max_steps under llm section. Add comment about browser-use being the automation engine.",
+    "Step 13 - Update .env.example: Keep GROQ_API_KEY, NAUKRI_EMAIL, NAUKRI_PASSWORD, NAUKRI_CONFIG_PATH. No changes needed.",
+    "Step 14 - Update README.md: Update architecture section to reflect browser-use agent. Update installation to note browser-use instead of playwright. Remove 'playwright install chromium' from setup. Mention that browser-use handles browser management internally. Update module table."
+  ],
+  "acceptance_criteria": [
+    "python -c 'from naukri_apply.main import cli' succeeds",
+    "python -c 'from naukri_apply.agent import NaukriAgent' succeeds",
+    "python -c 'from naukri_apply.browser import BrowserManager' succeeds",
+    "python -c 'from naukri_apply.config import load_config' succeeds",
+    "python -c 'from naukri_apply.models import ApplicationResult, JobListing' succeeds",
+    "python -c 'from naukri_apply.logger import CSVLogger' succeeds",
+    "The files easy_apply.py, external_apply.py, direct_apply.py, form_filler.py, llm_agent.py no longer exist in src/naukri_apply/",
+    "New file src/naukri_apply/agent.py exists with NaukriAgent class",
+    "main.py CLI commands (apply, check-session) still have the same interface (--config, --urls-file, --url, --dry-run)",
+    "config.example.yaml has model set to meta-llama/llama-4-scout-17b-16e-instruct"
+  ],
+  "verification": [
+    "Run: .venv/bin/python -c 'from naukri_apply.main import cli; from naukri_apply.agent import NaukriAgent; from naukri_apply.browser import BrowserManager; print(\"All imports OK\")'",
+    "Run: .venv/bin/python -m naukri_apply --help and confirm apply and check-session commands are listed",
+    "Run: ls src/naukri_apply/ and confirm agent.py exists and easy_apply.py, external_apply.py, direct_apply.py, form_filler.py, llm_agent.py do NOT exist"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

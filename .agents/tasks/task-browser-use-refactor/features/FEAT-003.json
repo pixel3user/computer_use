@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-003",
+  "type": "refactor",
+  "description": "Rewrite the test suite to match the new browser-use-based architecture. Tests should mock browser-use's Agent class rather than Playwright page objects. Keep test_config.py and test_logger.py and test_models.py with minimal changes. Replace test_applicator.py, test_easy_apply.py, test_external_apply.py, test_form_filler.py, test_llm_agent.py, test_direct_apply.py with new tests for the NaukriAgent class and updated BrowserManager.",
+  "status": "pending",
+  "steps": [
+    "Step 1 - Update tests/conftest.py: Keep sample_user_profile and sample_job_listing fixtures. Add a mock_config fixture that creates a full AppConfig-compatible mock (including llm.model, groq_api_key, user_data_dir, headless, etc.). Add a mock_agent_history fixture that returns a mock AgentHistoryList with a final_result() method.",
+    "Step 2 - Update tests/test_config.py: Update test_llm_config_defaults to check for new default model 'meta-llama/llama-4-scout-17b-16e-instruct'. Keep all other tests as-is since AppConfig structure is backward-compatible.",
+    "Step 3 - Keep tests/test_logger.py unchanged: The CSVLogger is unchanged.",
+    "Step 4 - Keep tests/test_models.py unchanged: The models are unchanged.",
+    "Step 5 - Delete tests/test_easy_apply.py, tests/test_external_apply.py, tests/test_form_filler.py, tests/test_llm_agent.py, tests/test_direct_apply.py: These test modules that no longer exist.",
+    "Step 6 - Rewrite tests/test_applicator.py as tests/test_agent.py: Create comprehensive tests for NaukriAgent: (a) test_apply_to_job_constructs_correct_task_prompt - verify the task prompt includes URL, user profile, and instructions; (b) test_apply_to_job_returns_applied_on_success - mock Agent.run() to return a successful result, verify ApplicationResult with APPLIED status; (c) test_apply_to_job_returns_failed_on_agent_error - mock Agent.run() to raise, verify FAILED status; (d) test_apply_to_job_dry_run_skips_application - verify dry_run returns SKIPPED without running the agent; (e) test_direct_apply_constructs_search_task - verify direct apply task mentions Google search and company career page; (f) test_direct_apply_returns_direct_applied_on_success; (g) test_check_login_status_returns_true_when_logged_in; (h) test_check_login_status_returns_false_when_not_logged_in; (i) test_parse_agent_result_extracts_metadata - test that job metadata is parsed from agent output.",
+    "Step 7 - Create tests/test_browser.py: Test the updated BrowserManager: (a) test_browser_manager_creates_profile_with_config - verify BrowserProfile is constructed with correct user_data_dir and headless settings; (b) test_browser_manager_context_manager - verify __aenter__ and __aexit__ work correctly; (c) test_get_browser_returns_session.",
+    "Step 8 - Run the full test suite and fix any import errors or failures."
+  ],
+  "acceptance_criteria": [
+    "pytest tests/ -v runs with 0 failures",
+    "All new tests in test_agent.py exercise the NaukriAgent class methods",
+    "test_config.py tests pass with updated model default",
+    "test_logger.py and test_models.py pass unchanged",
+    "No references to deleted modules (easy_apply, external_apply, form_filler, llm_agent, direct_apply) in any test file",
+    "Tests mock browser-use Agent.run() rather than Playwright page operations"
+  ],
+  "verification": [
+    "Run: cd /projects/sandbox/computer_use && .venv/bin/python -m pytest tests/ -v and confirm all tests pass",
+    "Run: .venv/bin/python -m pytest tests/test_agent.py -v and confirm agent tests pass",
+    "Run: .venv/bin/python -m pytest tests/test_config.py tests/test_logger.py tests/test_models.py -v and confirm unchanged modules pass"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

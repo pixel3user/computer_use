@@ -8,12 +8,11 @@ version = "0.1.0"
 description = "Automated job application bot for Naukri.com using Playwright"
 requires-python = ">=3.11"
 dependencies = [
-    "playwright",
+    "browser-use>=0.12.7",
     "pyyaml",
     "pydantic[email]>=2.0",
     "python-dotenv",
     "click",
-    "groq",
 ]
 
 [project.optional-dependencies]

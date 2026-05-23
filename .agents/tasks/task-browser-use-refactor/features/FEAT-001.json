@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-001",
+  "type": "chore",
+  "description": "Install browser-use and update project dependencies. Verify the package installs cleanly and basic imports work.",
+  "status": "completed",
+  "steps": [
+    "Update pyproject.toml: replace 'playwright' and 'groq' dependencies with 'browser-use>=0.12.8'. Keep pyyaml, pydantic[email]>=2.0, python-dotenv, click. The browser-use package already includes groq as a dependency.",
+    "Remove the playwright dependency entirely since browser-use uses its own browser management (cdp-use/playwright internally).",
+    "Run pip install -e '.[dev]' in the .venv to install the new dependencies.",
+    "Verify imports work: python -c 'from browser_use import Agent, BrowserSession, BrowserProfile, ChatGroq'",
+    "Run 'python -c \"from naukri_apply.models import UserProfile, ApplicationResult\"' to confirm existing models still import correctly."
+  ],
+  "acceptance_criteria": [
+    "pip install -e '.[dev]' succeeds without errors",
+    "python -c 'from browser_use import Agent, BrowserSession, BrowserProfile, ChatGroq' exits 0",
+    "python -c 'from naukri_apply.models import UserProfile' exits 0",
+    "python -c 'from naukri_apply.config import load_config' exits 0"
+  ],
+  "verification": [
+    "Run: cd /projects/sandbox/computer_use && .venv/bin/pip install -e '.[dev]' and confirm exit 0",
+    "Run: .venv/bin/python -c 'from browser_use import Agent, BrowserSession, BrowserProfile, ChatGroq; print(\"OK\")' and confirm OK output"
+  ],
+  "blocked_reason": null,
+  "findings": "browser-use 0.12.8 was not available on PyPI; used 0.12.7 (latest available). ChatGroq is importable from browser_use directly. groq package was upgraded from 1.2.0 to 1.0.0 (browser-use pins it). click was downgraded from 8.4.1 to 8.3.1 by browser-use. pydantic downgraded from 2.13.4 to 2.12.5 due to browser-use constraints. All naukri_apply model and config tests pass."
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "task-browser-use-refactor",
+  "task_description": "Refactor the Naukri auto-apply bot to use the browser-use library as the core automation agent, powered by Groq's meta-llama/llama-4-scout-17b-16e-instruct model. Replace all Playwright-based heuristics with browser-use's screenshot-based visual reasoning Agent.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}
