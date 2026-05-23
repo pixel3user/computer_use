@@ -1,0 +1,23 @@
+# Naukri Auto-Apply Configuration
+user_profile:
+  name: "Your Full Name"
+  email: "your_email@example.com"
+  phone: "+91-9999999999"
+  resume_path: "./resume.pdf"
+  linkedin_url: "https://linkedin.com/in/yourprofile"
+  experience_years: 5
+  current_company: "Current Company Name"
+  current_designation: "Software Engineer"
+  notice_period: "30 days"
+
+# Naukri.com credentials (can also be set via env vars)
+naukri_email: ""
+naukri_password: ""
+
+# Output settings
+output_csv: "applications.csv"
+
+# Browser settings
+headless: false
+slow_mo: 100
+user_data_dir: ".browser_data"

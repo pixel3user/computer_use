@@ -1,0 +1,7 @@
+{
+  "task_id": "task-naukri-auto-apply",
+  "task_description": "Build a Python-based browser automation script using Playwright that automates job applications on Naukri.com. Supports Easy Apply (internal) and external ATS form-filling. Logs all application attempts to a CSV file in real-time for manual follow-up and networking.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

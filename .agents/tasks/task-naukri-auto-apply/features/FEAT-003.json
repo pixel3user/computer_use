@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-003",
+  "type": "docs",
+  "description": "Create comprehensive README.md with setup instructions, usage guide, architecture overview, and security notes. Also create a sample URLs input file and ensure all example configs are complete.",
+  "status": "pending",
+  "steps": [
+    "Create README.md with sections: Project Overview, Features, Prerequisites (Python 3.11, Playwright), Installation (step-by-step with pyenv and venv), Configuration (explain YAML config + .env for secrets), Usage (CLI commands with examples), Input Format (URLs file format), Output (CSV log description with sample), Architecture (module descriptions), Security Notes (credential handling, session persistence), Troubleshooting (common issues), Limitations and Disclaimers (rate limiting, ToS awareness).",
+    "Create sample_urls.txt with example Naukri.com job listing URL format (one URL per line, with comments showing format)",
+    "Review and update config.example.yaml to ensure all fields are documented with inline comments explaining each option",
+    "Review .env.example to ensure it covers all secret fields",
+    "Verify the README instructions work end-to-end by running the documented setup commands"
+  ],
+  "acceptance_criteria": [
+    "README.md provides complete setup instructions that a developer can follow",
+    "README.md documents all CLI commands and their options",
+    "README.md explains the CSV output format",
+    "sample_urls.txt shows the expected input format",
+    "config.example.yaml has all fields with explanatory comments",
+    "Security best practices are documented (no hardcoded credentials)"
+  ],
+  "verification": [
+    "Run: source .venv/bin/activate && python -m naukri_apply --help (confirms setup instructions work)",
+    "Run: source .venv/bin/activate && pytest tests/ -v (confirms nothing broke)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "naukri-apply"
+version = "0.1.0"
+description = "Automated job application bot for Naukri.com using Playwright"
+requires-python = ">=3.11"
+dependencies = [
+    "playwright",
+    "pyyaml",
+    "pydantic[email]>=2.0",
+    "python-dotenv",
+    "click",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[project.scripts]
+naukri-apply = "naukri_apply.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
