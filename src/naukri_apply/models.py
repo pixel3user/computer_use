@@ -18,9 +18,22 @@ class UserProfile(BaseModel):
     notice_period: Optional[str] = None
 
 
+class LLMConfig(BaseModel):
+    enabled: bool = True
+    model: str = "meta-llama/llama-4-maverick-17b-128e-instruct"
+    max_tokens: int = 4096
+    temperature: float = 0.2
+
+
+class QuotaConfig(BaseModel):
+    max_naukri_applications: int = 50
+    enable_direct_apply: bool = True
+
+
 class ApplyType(str, Enum):
     EASY_APPLY = "easy_apply"
     EXTERNAL = "external"
+    DIRECT = "direct"
     UNKNOWN = "unknown"
 
 
@@ -29,6 +42,7 @@ class ApplicationStatus(str, Enum):
     FAILED = "failed"
     SKIPPED = "skipped"
     EXTERNAL_PARTIAL = "external_partial"
+    DIRECT_APPLIED = "direct_applied"
 
 
 class JobListing(BaseModel):

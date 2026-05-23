@@ -94,10 +94,24 @@ async def _run_apply(config_path: str, urls: list[str], dry_run: bool = False) -
     config = load_config(config_path)
     csv_logger = CSVLogger(config.output_csv)
 
+    # Initialize LLM agent if configured
+    llm_agent = None
+    if config.llm.enabled and config.groq_api_key:
+        try:
+            from naukri_apply.llm_agent import LLMAgent
+
+            llm_agent = LLMAgent(config)
+            click.echo("LLM agent initialized (Groq API)")
+        except Exception as e:
+            logger.debug("Failed to initialize LLM agent: %s", e)
+            click.echo(f"Warning: LLM agent not available: {e}")
+
     total = len(urls)
     applied = 0
     failed = 0
     skipped = 0
+    naukri_application_count = 0
+    switched_to_direct = False
 
     click.echo(f"Starting application process for {total} job(s)...")
 
@@ -106,6 +120,19 @@ async def _run_apply(config_path: str, urls: list[str], dry_run: bool = False) -
 
         for i, url in enumerate(urls, 1):
             click.echo(f"\n[{i}/{total}] Processing: {url}")
+
+            # Check if quota reached and switch to direct apply
+            if (
+                not switched_to_direct
+                and config.quota.enable_direct_apply
+                and llm_agent
+                and naukri_application_count >= config.quota.max_naukri_applications
+            ):
+                switched_to_direct = True
+                click.echo(
+                    f"\nQuota reached ({config.quota.max_naukri_applications} applications). "
+                    "Switching to direct company applications."
+                )
 
             try:
                 applicator = JobApplicator(page, config)
@@ -121,10 +148,26 @@ async def _run_apply(config_path: str, urls: list[str], dry_run: bool = False) -
                     skipped += 1
                     continue
 
+                # Use DirectApplyHandler if quota reached
+                if switched_to_direct:
+                    from naukri_apply.direct_apply import DirectApplyHandler
+
+                    handler = DirectApplyHandler(page, config, llm_agent)
+                    result = await handler.apply(job)
+                    csv_logger.log(result)
+
+                    if result.status == ApplicationStatus.DIRECT_APPLIED:
+                        applied += 1
+                        click.echo(f"  Status: DIRECT_APPLIED")
+                    else:
+                        failed += 1
+                        click.echo(f"  Status: FAILED - {result.notes}")
+                    continue
+
                 if job.apply_type == ApplyType.EASY_APPLY:
-                    handler = EasyApplyHandler(page, config)
+                    handler = EasyApplyHandler(page, config, llm_agent=llm_agent)
                 elif job.apply_type == ApplyType.EXTERNAL:
-                    handler = ExternalApplyHandler(page, config)
+                    handler = ExternalApplyHandler(page, config, llm_agent=llm_agent)
                 else:
                     from naukri_apply.models import ApplicationResult
 
@@ -144,9 +187,11 @@ async def _run_apply(config_path: str, urls: list[str], dry_run: bool = False) -
 
                 if result.status == ApplicationStatus.APPLIED:
                     applied += 1
+                    naukri_application_count += 1
                     click.echo(f"  Status: APPLIED")
                 elif result.status == ApplicationStatus.EXTERNAL_PARTIAL:
                     applied += 1
+                    naukri_application_count += 1
                     click.echo(f"  Status: EXTERNAL_PARTIAL")
                 elif result.status == ApplicationStatus.FAILED:
                     failed += 1

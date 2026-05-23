@@ -5,7 +5,7 @@ from typing import Optional
 import yaml
 from pydantic import BaseModel
 
-from naukri_apply.models import UserProfile
+from naukri_apply.models import LLMConfig, QuotaConfig, UserProfile
 
 
 class AppConfig(BaseModel):
@@ -18,6 +18,9 @@ class AppConfig(BaseModel):
     user_data_dir: Path = Path(".browser_data")
     delay_between_applications: float = 5.0
     signup_password: Optional[str] = None
+    llm: LLMConfig = LLMConfig()
+    quota: QuotaConfig = QuotaConfig()
+    groq_api_key: Optional[str] = None
 
 
 def load_config(config_path: str | Path) -> AppConfig:
@@ -44,5 +47,10 @@ def load_config(config_path: str | Path) -> AppConfig:
         data["naukri_email"] = env_email
     if env_password:
         data["naukri_password"] = env_password
+
+    # Load GROQ_API_KEY from environment
+    groq_api_key = os.environ.get("GROQ_API_KEY")
+    if groq_api_key:
+        data["groq_api_key"] = groq_api_key
 
     return AppConfig(**data)

@@ -46,3 +46,22 @@ headless: false
 slow_mo: 100
 # Directory to store browser session data (login persists between runs)
 user_data_dir: ".browser_data"
+
+# LLM settings (powered by Groq API)
+# Set GROQ_API_KEY in your .env file to enable LLM features.
+llm:
+  # Enable or disable LLM-powered form filling and screening question answering
+  enabled: true
+  # Model to use for LLM completions
+  model: "meta-llama/llama-4-maverick-17b-128e-instruct"
+  # Maximum tokens for LLM responses
+  max_tokens: 4096
+  # Temperature for LLM responses (lower = more deterministic)
+  temperature: 0.2
+
+# Quota and direct-apply settings
+quota:
+  # Maximum number of Naukri applications before switching to direct apply
+  max_naukri_applications: 50
+  # When true, after reaching the quota the bot applies directly on company sites
+  enable_direct_apply: true

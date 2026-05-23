@@ -1,6 +1,7 @@
 """External site application handler."""
 
 import logging
+from typing import TYPE_CHECKING
 
 from playwright.async_api import BrowserContext, Page
 
@@ -12,15 +13,19 @@ from naukri_apply.form_filler import (
 )
 from naukri_apply.models import ApplicationResult, ApplicationStatus, JobListing
 
+if TYPE_CHECKING:
+    from naukri_apply.llm_agent import LLMAgent
+
 logger = logging.getLogger(__name__)
 
 
 class ExternalApplyHandler:
     """Handles applications that redirect to external ATS platforms."""
 
-    def __init__(self, page: Page, config: AppConfig):
+    def __init__(self, page: Page, config: AppConfig, llm_agent: "LLMAgent | None" = None):
         self._page = page
         self._config = config
+        self._llm_agent = llm_agent
 
     async def apply(self, job: JobListing) -> ApplicationResult:
         """Click Apply, detect new tab, fill form on external site.
@@ -164,6 +169,28 @@ class ExternalApplyHandler:
             else:
                 logger.debug("No signup_password configured; skipping password field")
 
+        # Use LLM for any additional signup fields
+        if self._llm_agent:
+            try:
+                actions = await self._llm_agent.analyze_page_and_fill_form(
+                    page, profile, context="Signup/registration form"
+                )
+                for action in actions:
+                    action_type = action.get("action")
+                    selector = action.get("selector", "")
+                    value = action.get("value", "")
+                    try:
+                        if action_type == "fill" and selector and value:
+                            await page.fill(selector, value)
+                        elif action_type == "select" and selector and value:
+                            await page.select_option(selector, value=value)
+                        elif action_type == "click" and selector:
+                            await page.click(selector)
+                    except Exception as e:
+                        logger.debug("LLM signup action failed (%s): %s", action, e)
+            except Exception as e:
+                logger.debug("LLM signup form analysis failed: %s", e)
+
     async def _fill_application_form(self, page: Page) -> None:
         """Fill application form fields from user profile."""
         profile = self._config.user_profile
@@ -205,6 +232,28 @@ class ExternalApplyHandler:
         resume_field = await find_field(page, "resume")
         if resume_field:
             await upload_file(page, resume_field, str(profile.resume_path))
+
+        # Use LLM for any remaining unfilled fields
+        if self._llm_agent:
+            try:
+                actions = await self._llm_agent.analyze_page_and_fill_form(
+                    page, profile, context="External application form"
+                )
+                for action in actions:
+                    action_type = action.get("action")
+                    selector = action.get("selector", "")
+                    value = action.get("value", "")
+                    try:
+                        if action_type == "fill" and selector and value:
+                            await page.fill(selector, value)
+                        elif action_type == "select" and selector and value:
+                            await page.select_option(selector, value=value)
+                        elif action_type == "click" and selector:
+                            await page.click(selector)
+                    except Exception as e:
+                        logger.debug("LLM action failed (%s): %s", action, e)
+            except Exception as e:
+                logger.debug("LLM form analysis failed: %s", e)
 
     async def _submit_form(self, page: Page) -> None:
         """Try to submit the form."""

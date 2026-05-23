@@ -1,11 +1,15 @@
 """Easy Apply handler for Naukri.com jobs."""
 
 import logging
+from typing import TYPE_CHECKING
 
 from playwright.async_api import Page
 
 from naukri_apply.config import AppConfig
 from naukri_apply.models import ApplicationResult, ApplicationStatus, JobListing
+
+if TYPE_CHECKING:
+    from naukri_apply.llm_agent import LLMAgent
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +17,10 @@ logger = logging.getLogger(__name__)
 class EasyApplyHandler:
     """Handles the Easy Apply flow on Naukri.com."""
 
-    def __init__(self, page: Page, config: AppConfig):
+    def __init__(self, page: Page, config: AppConfig, llm_agent: "LLMAgent | None" = None):
         self._page = page
         self._config = config
+        self._llm_agent = llm_agent
 
     async def apply(self, job: JobListing) -> ApplicationResult:
         """Click Apply, handle dialogs/questionnaires, and confirm application.
@@ -86,15 +91,20 @@ class EasyApplyHandler:
     async def _handle_screening_questions(self) -> None:
         """Attempt to handle simple screening questions in modals/chatbot."""
         try:
-            # Check for radio button questions - select first option
+            # Check for radio button questions
             radio_buttons = self._page.locator(
                 "input[type='radio']"
             )
             count = await radio_buttons.count()
             if count > 0:
-                await radio_buttons.first.check()
+                if self._llm_agent:
+                    # Use LLM to pick the best radio option
+                    await self._handle_radio_with_llm(radio_buttons, count)
+                else:
+                    # Fallback: select first option
+                    await radio_buttons.first.check()
 
-            # Check for simple select dropdowns - select first non-empty option
+            # Check for simple select dropdowns
             selects = self._page.locator("select")
             select_count = await selects.count()
             for i in range(select_count):
@@ -103,9 +113,12 @@ class EasyApplyHandler:
                     options = select_el.locator("option")
                     option_count = await options.count()
                     if option_count > 1:
-                        value = await options.nth(1).get_attribute("value")
-                        if value:
-                            await select_el.select_option(value=value)
+                        if self._llm_agent:
+                            await self._handle_select_with_llm(select_el, options, option_count)
+                        else:
+                            value = await options.nth(1).get_attribute("value")
+                            if value:
+                                await select_el.select_option(value=value)
                 except Exception as e:
                     logger.debug("Failed to handle select dropdown %d: %s", i, e)
                     continue
@@ -129,6 +142,81 @@ class EasyApplyHandler:
                     continue
         except Exception as e:
             logger.debug("Error handling screening questions: %s", e)
+
+    async def _handle_radio_with_llm(self, radio_buttons, count: int) -> None:
+        """Use LLM to select the best radio button option."""
+        try:
+            # Extract question text and options
+            question_text = ""
+            option_texts = []
+
+            # Try to get the question text from nearby label or heading
+            parent = self._page.locator("input[type='radio']").first.locator("..")
+            question_text = await parent.inner_text()
+
+            for i in range(count):
+                radio = radio_buttons.nth(i)
+                label = await radio.evaluate(
+                    "el => el.labels && el.labels[0] ? el.labels[0].textContent.trim() : el.value"
+                )
+                option_texts.append(label)
+
+            if option_texts:
+                best_answer = await self._llm_agent.answer_screening_question(
+                    question_text, option_texts, self._config.user_profile
+                )
+                # Find and check the matching radio button
+                for i, opt in enumerate(option_texts):
+                    if opt == best_answer:
+                        await radio_buttons.nth(i).check()
+                        return
+
+            # Fallback to first option
+            await radio_buttons.first.check()
+        except Exception as e:
+            logger.debug("LLM radio handling failed, using fallback: %s", e)
+            await radio_buttons.first.check()
+
+    async def _handle_select_with_llm(self, select_el, options, option_count: int) -> None:
+        """Use LLM to select the best dropdown option."""
+        try:
+            option_texts = []
+            for i in range(option_count):
+                text = await options.nth(i).inner_text()
+                if text.strip():
+                    option_texts.append(text.strip())
+
+            if len(option_texts) > 1:
+                # Get question context from label if available
+                label_text = await select_el.evaluate(
+                    "el => el.labels && el.labels[0] ? el.labels[0].textContent.trim() : ''"
+                )
+                best_answer = await self._llm_agent.answer_screening_question(
+                    label_text or "Select the best option",
+                    option_texts,
+                    self._config.user_profile,
+                )
+                # Select by visible text matching
+                for i in range(option_count):
+                    text = await options.nth(i).inner_text()
+                    if text.strip() == best_answer:
+                        value = await options.nth(i).get_attribute("value")
+                        if value:
+                            await select_el.select_option(value=value)
+                            return
+
+            # Fallback to second option (skip empty first)
+            value = await options.nth(1).get_attribute("value")
+            if value:
+                await select_el.select_option(value=value)
+        except Exception as e:
+            logger.debug("LLM select handling failed, using fallback: %s", e)
+            try:
+                value = await options.nth(1).get_attribute("value")
+                if value:
+                    await select_el.select_option(value=value)
+            except Exception:
+                pass
 
     async def _wait_for_success(self) -> bool:
         """Wait for success indicators after applying."""

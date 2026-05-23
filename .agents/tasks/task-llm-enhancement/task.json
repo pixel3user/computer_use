@@ -1,0 +1,7 @@
+{
+  "task_id": "task-llm-enhancement",
+  "task_description": "Enhance the Naukri auto-apply bot with LLM-powered intelligence using Groq API. Two major enhancements: (1) LLM-powered form filling that replaces rule-based heuristics with intelligent form analysis, screening question answering, and adaptive navigation. (2) Quota bypass via direct company applications - when Naukri's 50-application limit is hit, the bot uses the LLM to find and apply directly on company career pages.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

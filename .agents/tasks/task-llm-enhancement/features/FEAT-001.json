@@ -1,0 +1,44 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add LLM agent module powered by Groq API, update config/models to support LLM settings, enhance form_filler and easy_apply/external_apply to use LLM for intelligent form filling, and add quota bypass via direct company applications.",
+  "status": "in_progress",
+  "steps": [
+    "Step 1: Add 'groq' to dependencies in pyproject.toml under [project].dependencies.",
+    "Step 2: Update .env.example to include GROQ_API_KEY=your_groq_api_key_here.",
+    "Step 3: Update config.example.yaml to include a new 'llm' section with fields: enabled (bool, default true), model (string, default 'meta-llama/llama-4-maverick-17b-128e-instruct'), max_tokens (int, default 4096), temperature (float, default 0.2). Also add a 'quota' section with: max_naukri_applications (int, default 50), enable_direct_apply (bool, default true).",
+    "Step 4: Update src/naukri_apply/models.py - Add new Pydantic models: LLMConfig (enabled, model, max_tokens, temperature), QuotaConfig (max_naukri_applications, enable_direct_apply), and a new ApplicationStatus enum value DIRECT_APPLIED = 'direct_applied'. Also add ApplyType.DIRECT = 'direct'.",
+    "Step 5: Update src/naukri_apply/config.py - Add LLMConfig and QuotaConfig as optional fields on AppConfig with defaults. Load GROQ_API_KEY from environment. Add groq_api_key: Optional[str] field to AppConfig.",
+    "Step 6: Create src/naukri_apply/llm_agent.py - This is the core LLM integration module. It should contain a class LLMAgent with: (a) __init__ takes AppConfig and initializes the Groq client with the API key. (b) async method 'analyze_page_and_fill_form(page: Page, user_profile: UserProfile, context: str)' that extracts visible page text/form elements, sends them to the LLM along with user profile as context, and returns a list of structured actions (fill field X with value Y, click button Z, select option W). (c) async method 'answer_screening_question(question_text: str, options: list[str], user_profile: UserProfile)' that uses the LLM to choose the best answer for screening questions. (d) async method 'find_company_career_page(company_name: str, job_title: str, location: str)' that constructs a search query and returns a likely URL for the company's career page. (e) async method 'navigate_and_apply_direct(page: Page, company_name: str, job_title: str, user_profile: UserProfile)' that drives the entire flow of finding a job on a company site and applying. The LLM should receive condensed page content (innerText, form fields with attributes) and respond with JSON-structured actions. Use the Groq SDK: from groq import Groq. The model to use comes from config.llm.model.",
+    "Step 7: Create src/naukri_apply/direct_apply.py - This module handles the quota bypass flow. Class DirectApplyHandler with: (a) __init__ takes Page, AppConfig, LLMAgent. (b) async method 'apply(job: JobListing)' that uses the LLM agent to search for the job on the company's careers site, navigate there, and fill/submit the application. It should: open a Google search for '{company_name} {job_title} careers apply', use the LLM to identify the right link from results, navigate to it, then use the LLM agent's page analysis to fill the application form. Returns ApplicationResult with status DIRECT_APPLIED on success or FAILED on error.",
+    "Step 8: Update src/naukri_apply/easy_apply.py - Enhance _handle_screening_questions to use the LLM agent when available. Instead of blindly selecting the first radio button or dropdown option, extract the question text and options, pass to LLMAgent.answer_screening_question(), and select the returned answer. Fall back to the old heuristic if LLM is not configured or fails.",
+    "Step 9: Update src/naukri_apply/external_apply.py - Enhance _fill_application_form to optionally use LLMAgent.analyze_page_and_fill_form() for pages that the rule-based approach cannot handle well. After the existing rule-based fill, if there are unfilled required fields or unknown form elements, invoke the LLM to handle them. Also update _fill_signup_form similarly.",
+    "Step 10: Update src/naukri_apply/main.py - Modify _run_apply to: (a) instantiate LLMAgent if config.llm.enabled and config.groq_api_key is set, (b) track application count, (c) when applied count reaches config.quota.max_naukri_applications and config.quota.enable_direct_apply is true, switch remaining URLs to use DirectApplyHandler instead of the normal Naukri flow, (d) pass LLMAgent to EasyApplyHandler and ExternalApplyHandler constructors (optional param, backward compatible), (e) log a message when switching to direct apply mode.",
+    "Step 11: Update src/naukri_apply/logger.py - Ensure the HEADERS list and log method handle the new DIRECT_APPLIED status and 'direct' apply_type without changes needed (they already use .value on enums, so just verify compatibility).",
+    "Step 12: Add tests in tests/test_llm_agent.py - Test LLMAgent class with mocked Groq client. Test: (a) analyze_page_and_fill_form returns structured actions given mocked LLM response, (b) answer_screening_question returns correct choice, (c) find_company_career_page returns a URL string, (d) handles API errors gracefully (returns empty/fallback). Mock the groq.Groq client.",
+    "Step 13: Add tests in tests/test_direct_apply.py - Test DirectApplyHandler with mocked LLMAgent and Page. Test: (a) successful direct apply flow returns DIRECT_APPLIED, (b) failure returns FAILED status, (c) the handler calls LLM agent methods in correct sequence.",
+    "Step 14: Update tests/test_config.py - Add test for loading config with new llm and quota sections. Add test that GROQ_API_KEY env var is loaded.",
+    "Step 15: Update tests/test_easy_apply.py - Add test that screening questions use LLM when available, and fall back to heuristic when LLM not configured.",
+    "Step 16: Run 'pip install -e .[dev]' to install the groq dependency and verify all tests pass with pytest tests/ -v."
+  ],
+  "acceptance_criteria": [
+    "Running 'pip install -e .[dev]' succeeds and installs the groq package",
+    "Running 'pytest tests/ -v' passes all tests (existing + new)",
+    "src/naukri_apply/llm_agent.py exists with LLMAgent class that has methods: analyze_page_and_fill_form, answer_screening_question, find_company_career_page, navigate_and_apply_direct",
+    "src/naukri_apply/direct_apply.py exists with DirectApplyHandler class that orchestrates quota bypass",
+    "config.example.yaml contains llm and quota sections",
+    ".env.example contains GROQ_API_KEY",
+    "models.py has DIRECT_APPLIED status and DIRECT apply type",
+    "main.py tracks application count and switches to direct apply after quota hit",
+    "easy_apply.py uses LLM for screening questions when available",
+    "external_apply.py uses LLM for form analysis when available",
+    "New test files test_llm_agent.py and test_direct_apply.py exist with meaningful tests"
+  ],
+  "verification": [
+    "source .venv/bin/activate && pip install -e '.[dev]' && echo 'Install OK'",
+    "source .venv/bin/activate && pytest tests/ -v",
+    "source .venv/bin/activate && python -c \"from naukri_apply.llm_agent import LLMAgent; from naukri_apply.direct_apply import DirectApplyHandler; from naukri_apply.models import ApplicationStatus; assert ApplicationStatus.DIRECT_APPLIED.value == 'direct_applied'; print('Imports OK')\""
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
