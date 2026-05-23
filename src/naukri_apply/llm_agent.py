@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import re
 from typing import Any
 
 from groq import Groq
@@ -12,6 +13,78 @@ from naukri_apply.config import AppConfig
 from naukri_apply.models import UserProfile
 
 logger = logging.getLogger(__name__)
+
+# Timeout in seconds for LLM API calls
+LLM_CALL_TIMEOUT = 30
+
+# Maximum iterations for multi-turn navigation loops
+MAX_NAVIGATION_ITERATIONS = 5
+
+# Regex pattern for allowed CSS selectors (form-related elements only)
+_ALLOWED_SELECTOR_PATTERN = re.compile(
+    r"^("
+    r"#[\w\-]+"  # ID selectors
+    r"|\.[\w\-]+"  # Class selectors
+    r"|\[[\w\-]+=['\"]?[\w\-@\.\/\s]+['\"]?\]"  # Attribute selectors
+    r"|input(\[[\w\-]+=['\"]?[\w\-@\.\/\s]+['\"]?\])?"  # input elements
+    r"|select(\[[\w\-]+=['\"]?[\w\-@\.\/\s]+['\"]?\])?"  # select elements
+    r"|textarea(\[[\w\-]+=['\"]?[\w\-@\.\/\s]+['\"]?\])?"  # textarea elements
+    r"|button(\[[\w\-]+=['\"]?[\w\-@\.\/\s]+['\"]?\])?"  # button elements
+    r"|a(\[[\w\-]+=['\"]?[\w\-@\.\/\s]+['\"]?\])?"  # anchor elements
+    r"|label(\[[\w\-]+=['\"]?[\w\-@\.\/\s]+['\"]?\])?"  # label elements
+    r")"
+    r"([\s>~+].*)?$",  # allow combinators/descendants
+    re.IGNORECASE,
+)
+
+# Patterns that should always be rejected
+_DANGEROUS_PATTERNS = re.compile(
+    r"(javascript:|data:|vbscript:|\*$|^\*|document\.|window\.|eval\(|on\w+=)",
+    re.IGNORECASE,
+)
+
+
+def validate_selector(selector: str) -> bool:
+    """Validate that a CSS selector is safe to execute against the page.
+
+    Only allows selectors targeting form-related elements (input, select,
+    textarea, button, anchor, label) or using ID/class/attribute selectors.
+    Rejects dangerous patterns like javascript: pseudo-protocols or
+    overly broad selectors.
+    """
+    if not selector or not selector.strip():
+        return False
+
+    selector = selector.strip()
+
+    # Reject dangerous patterns
+    if _DANGEROUS_PATTERNS.search(selector):
+        return False
+
+    # Reject overly broad selectors
+    if selector in ("*", "body", "html", "head"):
+        return False
+
+    # Allow selectors matching safe patterns
+    if _ALLOWED_SELECTOR_PATTERN.match(selector):
+        return True
+
+    # Allow Playwright text selectors and specific pseudo-selectors
+    if selector.startswith("text=") or ":has-text(" in selector:
+        return True
+
+    # Allow compound selectors (e.g., "button[type='submit']")
+    # by checking each part contains a form-related tag or attribute
+    parts = re.split(r"[\s>~+]+", selector)
+    form_tags = {"input", "select", "textarea", "button", "a", "label", "form", "option"}
+    for part in parts:
+        base_tag = re.match(r"^(\w+)", part)
+        if base_tag and base_tag.group(1).lower() not in form_tags:
+            return False
+        if not base_tag and not part.startswith(("#", ".", "[")):
+            return False
+
+    return True
 
 
 class LLMAgent:
@@ -38,10 +111,11 @@ class LLMAgent:
         return response.choices[0].message.content
 
     async def _call_llm_async(self, system_prompt: str, user_prompt: str) -> str:
-        """Wrap the synchronous Groq call in an executor for async usage."""
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None, self._call_llm, system_prompt, user_prompt
+        """Wrap the synchronous Groq call in an executor with a timeout."""
+        loop = asyncio.get_running_loop()
+        return await asyncio.wait_for(
+            loop.run_in_executor(None, self._call_llm, system_prompt, user_prompt),
+            timeout=LLM_CALL_TIMEOUT,
         )
 
     async def _extract_page_content(self, page: Page) -> str:
@@ -214,61 +288,84 @@ class LLMAgent:
     ) -> bool:
         """Drive the entire flow of finding a job on a company site and applying.
 
+        Uses a multi-turn loop: re-extracts page content and re-prompts the LLM
+        after page transitions, up to MAX_NAVIGATION_ITERATIONS iterations.
+
         Returns True if application was submitted successfully, False otherwise.
         """
-        try:
-            # Get page content after navigation
-            page_content = await self._extract_page_content(page)
-            profile_context = self._build_profile_context(user_profile)
+        profile_context = self._build_profile_context(user_profile)
 
-            system_prompt = (
-                "You are navigating a company careers page to apply for a job. "
-                "Analyze the page content and determine the next action to take. "
-                "If you see an application form, return fill actions. "
-                "If you see job listings, return a click action to navigate to the right job. "
-                "If you see a submit/apply button and the form is filled, return a click action for it. "
-                "Return a JSON array of actions:\n"
-                '- {"action": "fill", "selector": "<css selector>", "value": "<text value>"}\n'
-                '- {"action": "click", "selector": "<css selector>"}\n'
-                '- {"action": "select", "selector": "<css selector>", "value": "<option value>"}\n'
-                '- {"action": "done", "success": true/false}\n'
-                "Only return the JSON array, no other text."
-            )
+        system_prompt = (
+            "You are navigating a company careers page to apply for a job. "
+            "Analyze the page content and determine the next action to take. "
+            "If you see an application form, return fill actions. "
+            "If you see job listings, return a click action to navigate to the right job. "
+            "If you see a submit/apply button and the form is filled, return a click action for it. "
+            "Return a JSON array of actions:\n"
+            '- {"action": "fill", "selector": "<css selector>", "value": "<text value>"}\n'
+            '- {"action": "click", "selector": "<css selector>"}\n'
+            '- {"action": "select", "selector": "<css selector>", "value": "<option value>"}\n'
+            '- {"action": "done", "success": true/false}\n'
+            "Only return the JSON array, no other text."
+        )
 
-            user_prompt = (
-                f"TARGET JOB:\nCompany: {company_name}\nTitle: {job_title}\n\n"
-                f"USER PROFILE:\n{profile_context}\n\n"
-                f"PAGE CONTENT:\n{page_content}"
-            )
+        for iteration in range(MAX_NAVIGATION_ITERATIONS):
+            try:
+                # Re-extract page content each iteration
+                page_content = await self._extract_page_content(page)
 
-            response = await self._call_llm_async(system_prompt, user_prompt)
-            actions = json.loads(response.strip())
+                user_prompt = (
+                    f"TARGET JOB:\nCompany: {company_name}\nTitle: {job_title}\n\n"
+                    f"USER PROFILE:\n{profile_context}\n\n"
+                    f"PAGE CONTENT:\n{page_content}"
+                )
 
-            if not isinstance(actions, list):
+                response = await self._call_llm_async(system_prompt, user_prompt)
+                actions = json.loads(response.strip())
+
+                if not isinstance(actions, list):
+                    return False
+
+                page_transitioned = False
+                for action in actions:
+                    action_type = action.get("action")
+                    if action_type == "done":
+                        return action.get("success", False)
+                    elif action_type == "fill":
+                        selector = action.get("selector", "")
+                        value = action.get("value", "")
+                        if selector and value and validate_selector(selector):
+                            await page.fill(selector, value)
+                        elif selector and not validate_selector(selector):
+                            logger.debug("Rejected unsafe selector: %s", selector)
+                    elif action_type == "click":
+                        selector = action.get("selector", "")
+                        if selector and validate_selector(selector):
+                            await page.click(selector)
+                            await page.wait_for_load_state("domcontentloaded", timeout=10000)
+                            page_transitioned = True
+                        elif selector and not validate_selector(selector):
+                            logger.debug("Rejected unsafe selector: %s", selector)
+                    elif action_type == "select":
+                        selector = action.get("selector", "")
+                        value = action.get("value", "")
+                        if selector and value and validate_selector(selector):
+                            await page.select_option(selector, value=value)
+                        elif selector and not validate_selector(selector):
+                            logger.debug("Rejected unsafe selector: %s", selector)
+
+                # If no page transition occurred and no done action, we are stuck
+                if not page_transitioned:
+                    return False
+
+            except (json.JSONDecodeError, Exception) as e:
+                logger.debug(
+                    "LLM navigate_and_apply_direct failed (iteration %d): %s",
+                    iteration,
+                    e,
+                )
                 return False
 
-            for action in actions:
-                action_type = action.get("action")
-                if action_type == "done":
-                    return action.get("success", False)
-                elif action_type == "fill":
-                    selector = action.get("selector", "")
-                    value = action.get("value", "")
-                    if selector and value:
-                        await page.fill(selector, value)
-                elif action_type == "click":
-                    selector = action.get("selector", "")
-                    if selector:
-                        await page.click(selector)
-                        await page.wait_for_load_state("domcontentloaded", timeout=10000)
-                elif action_type == "select":
-                    selector = action.get("selector", "")
-                    value = action.get("value", "")
-                    if selector and value:
-                        await page.select_option(selector, value=value)
-
-            return True
-
-        except (json.JSONDecodeError, Exception) as e:
-            logger.debug("LLM navigate_and_apply_direct failed: %s", e)
-            return False
+        # Exhausted max iterations without a done action
+        logger.debug("navigate_and_apply_direct exhausted max iterations")
+        return False

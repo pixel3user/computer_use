@@ -23,26 +23,26 @@ class DirectApplyHandler:
     async def apply(self, job: JobListing) -> ApplicationResult:
         """Search for the job on the company's career site and apply directly.
 
-        Opens a Google search for the company's careers page, navigates there,
-        and uses the LLM agent to fill and submit the application form.
+        Uses the LLM agent to generate an effective search query, navigates
+        to the career page via Google, and uses the LLM agent to fill and
+        submit the application form.
 
         Returns ApplicationResult with DIRECT_APPLIED on success or FAILED on error.
         """
         try:
-            # Build search query
-            search_query = f"{job.company_name} {job.job_title} careers apply"
-            encoded_query = quote_plus(search_query)
+            # Use LLM to generate an effective search query
+            career_query = await self._llm_agent.find_company_career_page(
+                job.company_name, job.job_title, job.location
+            )
+            logger.debug("LLM career search query: %s", career_query)
+
+            # Build search URL using the LLM-generated query
+            encoded_query = quote_plus(career_query)
             search_url = f"https://www.google.com/search?q={encoded_query}"
 
             # Navigate to Google search
             await self._page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
             await self._page.wait_for_timeout(2000)
-
-            # Use LLM to find the right link from search results
-            career_query = await self._llm_agent.find_company_career_page(
-                job.company_name, job.job_title, job.location
-            )
-            logger.debug("LLM career search query: %s", career_query)
 
             # Click the first relevant search result
             clicked = await self._click_search_result(job.company_name)

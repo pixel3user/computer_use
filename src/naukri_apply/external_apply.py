@@ -11,6 +11,7 @@ from naukri_apply.form_filler import (
     find_field,
     upload_file,
 )
+from naukri_apply.llm_agent import validate_selector
 from naukri_apply.models import ApplicationResult, ApplicationStatus, JobListing
 
 if TYPE_CHECKING:
@@ -179,6 +180,9 @@ class ExternalApplyHandler:
                     action_type = action.get("action")
                     selector = action.get("selector", "")
                     value = action.get("value", "")
+                    if not validate_selector(selector):
+                        logger.debug("Rejected unsafe selector in signup: %s", selector)
+                        continue
                     try:
                         if action_type == "fill" and selector and value:
                             await page.fill(selector, value)
@@ -243,6 +247,9 @@ class ExternalApplyHandler:
                     action_type = action.get("action")
                     selector = action.get("selector", "")
                     value = action.get("value", "")
+                    if not validate_selector(selector):
+                        logger.debug("Rejected unsafe selector in form: %s", selector)
+                        continue
                     try:
                         if action_type == "fill" and selector and value:
                             await page.fill(selector, value)

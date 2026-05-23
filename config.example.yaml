@@ -49,6 +49,11 @@ user_data_dir: ".browser_data"
 
 # LLM settings (powered by Groq API)
 # Set GROQ_API_KEY in your .env file to enable LLM features.
+#
+# PRIVACY NOTE: When LLM features are enabled, user profile data (name, email,
+# phone, LinkedIn URL, experience, company, designation, notice period) is sent
+# to the Groq API as part of prompts for form filling and screening questions.
+# Ensure you are comfortable with this data being processed by a third-party API.
 llm:
   # Enable or disable LLM-powered form filling and screening question answering
   enabled: true

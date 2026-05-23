@@ -111,7 +111,10 @@ async def _run_apply(config_path: str, urls: list[str], dry_run: bool = False) -
     failed = 0
     skipped = 0
     naukri_application_count = 0
+    naukri_attempt_count = 0
     switched_to_direct = False
+    # If consecutive failures exceed this threshold, switch to direct mode
+    failure_threshold = max(10, config.quota.max_naukri_applications // 5)
 
     click.echo(f"Starting application process for {total} job(s)...")
 
@@ -126,11 +129,15 @@ async def _run_apply(config_path: str, urls: list[str], dry_run: bool = False) -
                 not switched_to_direct
                 and config.quota.enable_direct_apply
                 and llm_agent
-                and naukri_application_count >= config.quota.max_naukri_applications
+                and (
+                    naukri_application_count >= config.quota.max_naukri_applications
+                    or naukri_attempt_count >= config.quota.max_naukri_applications + failure_threshold
+                )
             ):
                 switched_to_direct = True
                 click.echo(
-                    f"\nQuota reached ({config.quota.max_naukri_applications} applications). "
+                    f"\nQuota reached ({naukri_application_count} applications, "
+                    f"{naukri_attempt_count} attempts). "
                     "Switching to direct company applications."
                 )
 
@@ -185,13 +192,15 @@ async def _run_apply(config_path: str, urls: list[str], dry_run: bool = False) -
                 result = await result
                 csv_logger.log(result)
 
+                # Count every attempt (success or failure) toward the attempt threshold
+                naukri_attempt_count += 1
+
                 if result.status == ApplicationStatus.APPLIED:
                     applied += 1
                     naukri_application_count += 1
                     click.echo(f"  Status: APPLIED")
                 elif result.status == ApplicationStatus.EXTERNAL_PARTIAL:
                     applied += 1
-                    naukri_application_count += 1
                     click.echo(f"  Status: EXTERNAL_PARTIAL")
                 elif result.status == ApplicationStatus.FAILED:
                     failed += 1
