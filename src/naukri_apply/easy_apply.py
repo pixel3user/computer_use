@@ -1,9 +1,13 @@
 """Easy Apply handler for Naukri.com jobs."""
 
+import logging
+
 from playwright.async_api import Page
 
 from naukri_apply.config import AppConfig
 from naukri_apply.models import ApplicationResult, ApplicationStatus, JobListing
+
+logger = logging.getLogger(__name__)
 
 
 class EasyApplyHandler:
@@ -74,7 +78,8 @@ class EasyApplyHandler:
                 locator = self._page.locator(selector).first
                 if await locator.is_visible(timeout=3000):
                     return locator
-            except Exception:
+            except Exception as e:
+                logger.debug("Apply button selector '%s' failed: %s", selector, e)
                 continue
         return None
 
@@ -101,7 +106,8 @@ class EasyApplyHandler:
                         value = await options.nth(1).get_attribute("value")
                         if value:
                             await select_el.select_option(value=value)
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed to handle select dropdown %d: %s", i, e)
                     continue
 
             # Look for submit/next/continue button in the modal
@@ -118,10 +124,11 @@ class EasyApplyHandler:
                         await btn.click()
                         await self._page.wait_for_timeout(1000)
                         break
-                except Exception:
+                except Exception as e:
+                    logger.debug("Screening submit selector '%s' failed: %s", selector, e)
                     continue
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Error handling screening questions: %s", e)
 
     async def _wait_for_success(self) -> bool:
         """Wait for success indicators after applying."""
@@ -139,7 +146,8 @@ class EasyApplyHandler:
                     locator = self._page.locator(indicator).first
                     if await locator.is_visible(timeout=5000):
                         return True
-                except Exception:
+                except Exception as e:
+                    logger.debug("Success indicator '%s' check failed: %s", indicator, e)
                     continue
 
             # Final timeout-based check
@@ -151,9 +159,11 @@ class EasyApplyHandler:
                     locator = self._page.locator(indicator).first
                     if await locator.is_visible(timeout=2000):
                         return True
-                except Exception:
+                except Exception as e:
+                    logger.debug("Re-check indicator '%s' failed: %s", indicator, e)
                     continue
 
             return False
-        except Exception:
+        except Exception as e:
+            logger.debug("Error waiting for success confirmation: %s", e)
             return False

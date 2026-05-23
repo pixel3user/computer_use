@@ -1,9 +1,13 @@
 """Job page navigation and metadata extraction."""
 
+import logging
+
 from playwright.async_api import Page
 
 from naukri_apply.config import AppConfig
 from naukri_apply.models import ApplyType, JobListing
+
+logger = logging.getLogger(__name__)
 
 
 class JobApplicator:
@@ -49,7 +53,8 @@ class JobApplicator:
                     text = await element.text_content()
                     if text and text.strip():
                         return text.strip()
-            except Exception:
+            except Exception as e:
+                logger.debug("Selector '%s' failed for job title: %s", selector, e)
                 continue
         return "Unknown"
 
@@ -68,7 +73,8 @@ class JobApplicator:
                     text = await element.text_content()
                     if text and text.strip():
                         return text.strip()
-            except Exception:
+            except Exception as e:
+                logger.debug("Selector '%s' failed for company name: %s", selector, e)
                 continue
         return "Unknown"
 
@@ -87,12 +93,17 @@ class JobApplicator:
                     text = await element.text_content()
                     if text and text.strip():
                         return text.strip()
-            except Exception:
+            except Exception as e:
+                logger.debug("Selector '%s' failed for location: %s", selector, e)
                 continue
         return "Unknown"
 
     async def _determine_apply_type(self) -> ApplyType:
-        """Determine if the job uses Easy Apply or external application."""
+        """Determine if the job uses Easy Apply or external application.
+
+        Only returns EASY_APPLY if the button text explicitly contains
+        "easy apply" or "apply". Returns UNKNOWN if the text is ambiguous.
+        """
         try:
             # Look for apply button
             apply_button = self._page.locator(
@@ -107,13 +118,16 @@ class JobApplicator:
             if href and "naukri.com" not in href:
                 return ApplyType.EXTERNAL
 
-            # Check button text for Easy Apply indicators
+            # Check button text for apply type indicators
             text = await apply_button.text_content()
             if text:
-                lower_text = text.lower()
-                if "easy apply" in lower_text or "apply on company" not in lower_text:
+                lower_text = text.lower().strip()
+                if "apply on company" in lower_text:
+                    return ApplyType.EXTERNAL
+                if "easy apply" in lower_text or lower_text == "apply":
                     return ApplyType.EASY_APPLY
 
-            return ApplyType.EASY_APPLY
-        except Exception:
+            return ApplyType.UNKNOWN
+        except Exception as e:
+            logger.debug("Error determining apply type: %s", e)
             return ApplyType.UNKNOWN

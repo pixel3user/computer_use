@@ -3,12 +3,9 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-from dotenv import load_dotenv
 from pydantic import BaseModel
 
 from naukri_apply.models import UserProfile
-
-load_dotenv()
 
 
 class AppConfig(BaseModel):
@@ -19,14 +16,21 @@ class AppConfig(BaseModel):
     headless: bool = False
     slow_mo: int = 100
     user_data_dir: Path = Path(".browser_data")
+    delay_between_applications: float = 5.0
+    signup_password: Optional[str] = None
 
 
 def load_config(config_path: str | Path) -> AppConfig:
     """Load application configuration from a YAML file.
 
     Environment variables NAUKRI_EMAIL and NAUKRI_PASSWORD override
-    the values specified in the YAML file.
+    the values specified in the YAML file. A .env file is loaded
+    at this point (not at import time) to inject secrets.
     """
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
     config_path = Path(config_path)
 
     with open(config_path, "r") as f:

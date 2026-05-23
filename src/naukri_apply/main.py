@@ -1,6 +1,7 @@
 """CLI entry point for Naukri auto-apply bot."""
 
 import asyncio
+import logging
 import os
 import sys
 from pathlib import Path
@@ -8,6 +9,8 @@ from pathlib import Path
 import click
 
 from naukri_apply.config import load_config
+
+logger = logging.getLogger(__name__)
 
 
 @click.group()
@@ -38,7 +41,13 @@ def cli():
     multiple=True,
     help="Single job URL (can be repeated)",
 )
-def apply_command(config_path, urls_file, urls):
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Navigate and extract metadata but do not click any apply buttons",
+)
+def apply_command(config_path, urls_file, urls, dry_run):
     """Apply to jobs from provided URLs."""
     # Resolve config path
     if config_path is None:
@@ -62,15 +71,18 @@ def apply_command(config_path, urls_file, urls):
         click.echo("Error: No URLs provided. Use --url or --urls-file.", err=True)
         sys.exit(1)
 
+    if dry_run:
+        click.echo("DRY RUN MODE: No applications will be submitted.")
+
     # Run the async apply logic
     try:
-        asyncio.run(_run_apply(config_path, all_urls))
+        asyncio.run(_run_apply(config_path, all_urls, dry_run=dry_run))
     except KeyboardInterrupt:
         click.echo("\nInterrupted by user. Shutting down gracefully.")
         sys.exit(0)
 
 
-async def _run_apply(config_path: str, urls: list[str]) -> None:
+async def _run_apply(config_path: str, urls: list[str], dry_run: bool = False) -> None:
     """Main async logic for applying to jobs."""
     from naukri_apply.applicator import JobApplicator
     from naukri_apply.browser import BrowserManager
@@ -80,7 +92,7 @@ async def _run_apply(config_path: str, urls: list[str]) -> None:
     from naukri_apply.models import ApplyType, ApplicationStatus
 
     config = load_config(config_path)
-    logger = CSVLogger(config.output_csv)
+    csv_logger = CSVLogger(config.output_csv)
 
     total = len(urls)
     applied = 0
@@ -104,6 +116,11 @@ async def _run_apply(config_path: str, urls: list[str]) -> None:
                 click.echo(f"  Location: {job.location}")
                 click.echo(f"  Type: {job.apply_type.value}")
 
+                if dry_run:
+                    click.echo(f"  [DRY RUN] Would apply via: {job.apply_type.value}")
+                    skipped += 1
+                    continue
+
                 if job.apply_type == ApplyType.EASY_APPLY:
                     handler = EasyApplyHandler(page, config)
                 elif job.apply_type == ApplyType.EXTERNAL:
@@ -116,14 +133,14 @@ async def _run_apply(config_path: str, urls: list[str]) -> None:
                         status=ApplicationStatus.SKIPPED,
                         notes="Could not determine apply type",
                     )
-                    logger.log(result)
+                    csv_logger.log(result)
                     skipped += 1
                     click.echo(f"  Status: SKIPPED (unknown apply type)")
                     continue
 
                 result = handler.apply(job)
                 result = await result
-                logger.log(result)
+                csv_logger.log(result)
 
                 if result.status == ApplicationStatus.APPLIED:
                     applied += 1
@@ -140,7 +157,15 @@ async def _run_apply(config_path: str, urls: list[str]) -> None:
 
             except Exception as e:
                 failed += 1
+                logger.debug("Error processing URL %s: %s", url, e)
                 click.echo(f"  Error: {str(e)}")
+
+            # Rate limiting: wait between applications
+            if i < total:
+                delay = config.delay_between_applications
+                if delay > 0 and not dry_run:
+                    logger.debug("Waiting %.1f seconds before next application", delay)
+                    await asyncio.sleep(delay)
 
     click.echo(f"\n{'='*50}")
     click.echo(f"Summary: {total} processed, {applied} applied, {failed} failed, {skipped} skipped")

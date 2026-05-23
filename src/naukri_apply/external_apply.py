@@ -1,5 +1,7 @@
 """External site application handler."""
 
+import logging
+
 from playwright.async_api import BrowserContext, Page
 
 from naukri_apply.config import AppConfig
@@ -9,6 +11,8 @@ from naukri_apply.form_filler import (
     upload_file,
 )
 from naukri_apply.models import ApplicationResult, ApplicationStatus, JobListing
+
+logger = logging.getLogger(__name__)
 
 
 class ExternalApplyHandler:
@@ -61,6 +65,7 @@ class ExternalApplyHandler:
             )
 
         except Exception as e:
+            logger.debug("External apply failed: %s", e)
             return ApplicationResult(
                 job=job,
                 status=ApplicationStatus.FAILED,
@@ -86,7 +91,8 @@ class ExternalApplyHandler:
                         await locator.click()
                     new_page = await new_page_info.value
                     return new_page
-            except Exception:
+            except Exception as e:
+                logger.debug("Selector '%s' did not open new page: %s", selector, e)
                 continue
 
         # Fallback: try clicking without expecting new page
@@ -97,7 +103,8 @@ class ExternalApplyHandler:
                     await locator.click()
                     await self._page.wait_for_timeout(3000)
                     return None
-            except Exception:
+            except Exception as e:
+                logger.debug("Fallback click failed for '%s': %s", selector, e)
                 continue
 
         return None
@@ -137,7 +144,8 @@ class ExternalApplyHandler:
                 locator = page.locator(indicator).first
                 if await locator.is_visible(timeout=3000):
                     return True
-            except Exception:
+            except Exception as e:
+                logger.debug("Signup indicator '%s' check failed: %s", indicator, e)
                 continue
         return False
 
@@ -151,7 +159,10 @@ class ExternalApplyHandler:
 
         password_field = await find_field(page, "password")
         if password_field:
-            await fill_text_field(password_field, "AutoApply2024!")
+            if self._config.signup_password:
+                await fill_text_field(password_field, self._config.signup_password)
+            else:
+                logger.debug("No signup_password configured; skipping password field")
 
     async def _fill_application_form(self, page: Page) -> None:
         """Fill application form fields from user profile."""
@@ -211,5 +222,6 @@ class ExternalApplyHandler:
                     await locator.click()
                     await page.wait_for_timeout(3000)
                     return
-            except Exception:
+            except Exception as e:
+                logger.debug("Submit selector '%s' failed: %s", selector, e)
                 continue

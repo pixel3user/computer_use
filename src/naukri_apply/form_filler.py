@@ -1,6 +1,10 @@
 """Utility functions for detecting and filling form fields."""
 
+import logging
+
 from playwright.async_api import Locator, Page
+
+logger = logging.getLogger(__name__)
 
 
 # Mapping of field types to lists of CSS/text selectors to try
@@ -80,7 +84,8 @@ async def find_field(page: Page, field_type: str) -> Locator | None:
             locator = page.locator(pattern).first
             if await locator.is_visible(timeout=2000):
                 return locator
-        except Exception:
+        except Exception as e:
+            logger.debug("Field '%s' pattern '%s' failed: %s", field_type, pattern, e)
             continue
     return None
 
@@ -105,10 +110,11 @@ async def select_dropdown(locator: Locator, value: str) -> None:
     """
     try:
         await locator.select_option(label=value, timeout=3000)
-    except Exception:
+    except Exception as e:
+        logger.debug("select_option failed for value '%s': %s", value, e)
         try:
             await locator.click()
             option = locator.page.locator(f"text={value}").first
             await option.click(timeout=3000)
-        except Exception:
-            pass
+        except Exception as e2:
+            logger.debug("Fallback dropdown selection failed: %s", e2)

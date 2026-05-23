@@ -28,8 +28,16 @@ user_profile:
 naukri_email: ""
 naukri_password: ""
 
+# Password used when filling signup forms on external ATS sites (optional).
+# If not set, password fields on external signup forms will be skipped.
+signup_password: ""
+
 # Path to the CSV file where application results are logged
 output_csv: "applications.csv"
+
+# Delay in seconds between processing each job URL.
+# Helps avoid rate-limiting or account flags from rapid requests.
+delay_between_applications: 5.0
 
 # Browser settings
 # Set to true to run without a visible browser window
