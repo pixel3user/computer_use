@@ -1,4 +1,4 @@
-# Naukri Auto-Apply Configuration
+# Naukri Auto-Apply Configuration (powered by browser-use)
 # Copy this file to config.yaml and fill in your details.
 
 # Your profile information used to fill application forms
@@ -47,7 +47,7 @@ slow_mo: 100
 # Directory to store browser session data (login persists between runs)
 user_data_dir: ".browser_data"
 
-# LLM settings (powered by Groq API)
+# LLM settings (powered by Groq API via browser-use)
 # Set GROQ_API_KEY in your .env file to enable LLM features.
 #
 # PRIVACY NOTE: When LLM features are enabled, user profile data (name, email,
@@ -58,11 +58,13 @@ llm:
   # Enable or disable LLM-powered form filling and screening question answering
   enabled: true
   # Model to use for LLM completions
-  model: "meta-llama/llama-4-maverick-17b-128e-instruct"
+  model: "meta-llama/llama-4-scout-17b-16e-instruct"
   # Maximum tokens for LLM responses
   max_tokens: 4096
   # Temperature for LLM responses (lower = more deterministic)
   temperature: 0.2
+  # Maximum number of browser-use agent steps per task
+  max_steps: 50
 
 # Quota and direct-apply settings
 quota:

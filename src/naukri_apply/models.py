@@ -20,9 +20,10 @@ class UserProfile(BaseModel):
 
 class LLMConfig(BaseModel):
     enabled: bool = True
-    model: str = "meta-llama/llama-4-maverick-17b-128e-instruct"
+    model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
     max_tokens: int = 4096
     temperature: float = 0.2
+    max_steps: int = 50
 
 
 class QuotaConfig(BaseModel):

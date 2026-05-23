@@ -1,9 +1,10 @@
 # Naukri Auto-Apply
 
-Automated job application bot for Naukri.com using Playwright.
+Automated job application bot for Naukri.com using browser-use.
 
 ## Features
 
+- AI-powered visual browser automation via browser-use
 - Automated Easy Apply for Naukri.com internal applications
 - External ATS form detection and auto-fill (Greenhouse, Lever, Workday, custom)
 - Real-time CSV logging of all application attempts
@@ -16,6 +17,7 @@ Automated job application bot for Naukri.com using Playwright.
 - Python 3.11+
 - A Naukri.com account with profile and resume set up
 - Your resume as a PDF file
+- A Groq API key (for LLM-powered automation)
 
 ## Installation
 
@@ -34,9 +36,6 @@ source .venv/bin/activate  # Linux/Mac
 
 # Install the package with dependencies
 pip install -e '.[dev]'
-
-# Install Playwright browser
-playwright install chromium
 ```
 
 ## Configuration
@@ -62,7 +61,7 @@ Edit `config.yaml` and fill in your profile details.
 cp .env.example .env
 ```
 
-Edit `.env` and set your Naukri.com credentials.
+Edit `.env` and set your Naukri.com credentials and Groq API key.
 
 ### Configuration Reference
 
@@ -161,6 +160,7 @@ timestamp,company_name,job_title,location,url,apply_type,status,notes
 | `failed` | Application could not be completed |
 | `skipped` | Job was skipped (e.g., unknown apply type) |
 | `external_partial` | External form was partially filled but may need manual completion |
+| `direct_applied` | Applied directly on the company's career page |
 
 ### Using the CSV for follow-up
 
@@ -176,11 +176,8 @@ The CSV file can be opened in any spreadsheet application. Use it to:
 | `main.py` | CLI entry point (Click) |
 | `config.py` | Configuration loading from YAML + environment variables |
 | `models.py` | Data models (Pydantic) for user profile, job listings, and results |
-| `browser.py` | Browser session management via Playwright |
-| `applicator.py` | Job page parsing and apply type detection |
-| `easy_apply.py` | Naukri Easy Apply handler |
-| `external_apply.py` | External ATS form handler |
-| `form_filler.py` | Form field detection and filling utilities |
+| `browser.py` | Browser session management via browser-use |
+| `agent.py` | AI-powered job application agent using browser-use Agent |
 | `logger.py` | Real-time CSV logging |
 
 ## Security Notes
@@ -197,7 +194,7 @@ The CSV file can be opened in any spreadsheet application. Use it to:
 |-------|----------|
 | "NOT logged in" | Run with `headless: false` in config, manually log in to Naukri.com in the browser window. The session persists in `.browser_data/`. |
 | Timeouts | Increase `slow_mo` in config.yaml. Check your internet connection. |
-| Elements not found | Naukri.com may have updated their UI. Selectors in the code may need updating. |
+| Agent failures | Check Groq API key is set correctly. Increase `max_steps` in config if tasks are timing out. |
 | External apply failures | External sites vary widely. `external_partial` status is expected for many sites. |
 | Import errors | Make sure you installed with `pip install -e '.[dev]'` and activated your venv. |
 

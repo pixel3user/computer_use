@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "refactor",
   "description": "Refactor the core source modules to use browser-use Agent as the automation engine. Replace Playwright-based browser management, job applicator, easy apply, external apply, direct apply, form filler, and LLM agent with a browser-use-powered agent wrapper. Keep models.py, logger.py, and the CLI interface (main.py) largely intact.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Step 1 - Update src/naukri_apply/config.py: Add a 'browser_use' section to AppConfig for browser-use specific settings. Change LLMConfig default model to 'meta-llama/llama-4-scout-17b-16e-instruct'. Add max_steps field (default 50). Keep all existing fields for backward compatibility. The config should include model, temperature, max_tokens, max_steps.",
     "Step 2 - Update src/naukri_apply/models.py: Keep all existing models as-is. No changes needed since the data models (UserProfile, JobListing, ApplicationResult, enums) are independent of the automation framework.",

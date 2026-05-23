@@ -92,7 +92,7 @@ class TestConfigLoading:
         config = load_config(config_file)
 
         assert config.llm.enabled is True
-        assert config.llm.model == "meta-llama/llama-4-maverick-17b-128e-instruct"
+        assert config.llm.model == "meta-llama/llama-4-scout-17b-16e-instruct"
         assert config.llm.max_tokens == 4096
         assert config.llm.temperature == 0.2
 
